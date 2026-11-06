@@ -1,0 +1,3 @@
+include README.md
+include LICENSE
+recursive-include frappe_observability *.json *.js *.css *.html *.txt

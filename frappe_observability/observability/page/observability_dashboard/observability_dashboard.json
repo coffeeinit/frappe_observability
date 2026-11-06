@@ -1,0 +1,13 @@
+{
+  "doctype": "Page",
+  "name": "observability-dashboard",
+  "page_name": "observability-dashboard",
+  "title": "Observability Dashboard",
+  "module": "Observability",
+  "standard": "Yes",
+  "roles": [
+    {"role": "Observability Viewer"},
+    {"role": "Observability Admin"},
+    {"role": "System Manager"}
+  ]
+}
