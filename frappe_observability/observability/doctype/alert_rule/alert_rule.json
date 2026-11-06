@@ -1,0 +1,32 @@
+{
+  "doctype": "DocType",
+  "name": "Alert Rule",
+  "module": "Observability",
+  "custom": 0,
+  "autoname": "field:title",
+  "istable": 0,
+  "editable_grid": 0,
+  "track_changes": 1,
+  "allow_rename": 0,
+  "engine": "InnoDB",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "field_order": ["title", "enabled", "metric_name", "operator", "threshold", "window_minutes", "cooldown_minutes", "severity", "message", "description"],
+  "fields": [
+    {"fieldname": "title", "label": "Rule Name", "fieldtype": "Data", "reqd": 1, "unique": 1, "in_list_view": 1},
+    {"fieldname": "enabled", "label": "Enabled", "fieldtype": "Check", "default": "1", "in_list_view": 1},
+    {"fieldname": "metric_name", "label": "Metric Name", "fieldtype": "Data", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "operator", "label": "Operator", "fieldtype": "Select", "options": ">\n>=\n<\n<=\n==\n!=", "default": ">=", "reqd": 1},
+    {"fieldname": "threshold", "label": "Threshold", "fieldtype": "Float", "reqd": 1},
+    {"fieldname": "window_minutes", "label": "Evaluation Window (Minutes)", "fieldtype": "Int", "default": "5", "reqd": 1, "non_negative": 1},
+    {"fieldname": "cooldown_minutes", "label": "Notification Cooldown (Minutes)", "fieldtype": "Int", "default": "30", "reqd": 1, "non_negative": 1},
+    {"fieldname": "severity", "label": "Severity", "fieldtype": "Select", "options": "Info\nWarning\nCritical", "default": "Warning", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "message", "label": "Notification Message", "fieldtype": "Small Text"},
+    {"fieldname": "description", "label": "Description", "fieldtype": "Small Text"}
+  ],
+  "permissions": [
+    {"role": "Observability Viewer", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0},
+    {"role": "Observability Admin", "read": 1, "write": 1, "create": 1, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0},
+    {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0}
+  ]
+}

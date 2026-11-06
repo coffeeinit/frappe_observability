@@ -1,0 +1,29 @@
+{
+  "doctype": "DocType",
+  "name": "Metric Bucket",
+  "module": "Observability",
+  "custom": 0,
+  "autoname": "hash",
+  "istable": 0,
+  "editable_grid": 0,
+  "track_changes": 0,
+  "allow_rename": 0,
+  "engine": "InnoDB",
+  "sort_field": "ts",
+  "sort_order": "DESC",
+  "field_order": ["ts", "metric", "host", "label", "count", "sum", "max"],
+  "fields": [
+    {"fieldname": "ts", "label": "Timestamp", "fieldtype": "Datetime", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "metric", "label": "Metric", "fieldtype": "Data", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "host", "label": "Host", "fieldtype": "Data", "in_list_view": 1},
+    {"fieldname": "label", "label": "Bounded Label", "fieldtype": "Data", "in_list_view": 1},
+    {"fieldname": "count", "label": "Count", "fieldtype": "Float", "reqd": 1},
+    {"fieldname": "sum", "label": "Sum", "fieldtype": "Float", "reqd": 1},
+    {"fieldname": "max", "label": "Max", "fieldtype": "Float", "reqd": 1}
+  ],
+  "permissions": [
+    {"role": "Observability Viewer", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0},
+    {"role": "Observability Admin", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0},
+    {"role": "System Manager", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "doctype": "DocType",
+  "name": "Log Access Entry",
+  "module": "Observability",
+  "custom": 0,
+  "autoname": "hash",
+  "istable": 0,
+  "editable_grid": 0,
+  "track_changes": 0,
+  "allow_rename": 0,
+  "engine": "InnoDB",
+  "sort_field": "time",
+  "sort_order": "DESC",
+  "field_order": ["time", "user", "ip", "action", "scope", "file", "bytes", "outcome"],
+  "fields": [
+    {"fieldname": "time", "label": "Time", "fieldtype": "Datetime", "reqd": 1, "in_list_view": 1, "in_standard_filter": 1},
+    {"fieldname": "user", "label": "User", "fieldtype": "Link", "options": "User", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "ip", "label": "IP Address", "fieldtype": "Data", "in_list_view": 1},
+    {"fieldname": "action", "label": "Action", "fieldtype": "Data", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "scope", "label": "Scope", "fieldtype": "Select", "options": "site\nbench", "in_list_view": 1},
+    {"fieldname": "file", "label": "Absolute Path", "fieldtype": "Small Text"},
+    {"fieldname": "bytes", "label": "Bytes", "fieldtype": "Int", "default": "0"},
+    {"fieldname": "outcome", "label": "Outcome", "fieldtype": "Data", "in_list_view": 1}
+  ],
+  "permissions": [
+    {"role": "Observability Admin", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0},
+    {"role": "System Manager", "read": 1, "write": 0, "create": 0, "delete": 0, "report": 0, "export": 0, "print": 0, "email": 0, "share": 0}
+  ]
+}

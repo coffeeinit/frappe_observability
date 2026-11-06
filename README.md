@@ -1,9 +1,30 @@
-# SRS: Frappe Observability (`frappe_observability`) v1.0
+# Frappe Observability (`frappe_observability`)
 
-Target: Frappe Framework + ERPNext **16.5 only**. DB: MariaDB. Self-hosted bench.
-Status: draft for client review.
+Target: current upstream Frappe Framework and ERPNext `develop` branches. The upstream repositories currently identify `develop` as their default branch. Frappe Framework's current `develop` metadata requires Python `>=3.14,<3.15`; this app declares the corresponding Frappe 17 development dependency range. Database: MariaDB. Deployment: self-hosted bench.
 
-<img width="1536" height="1024" alt="Frappe Observability Architecture Diagram" src="https://github.com/user-attachments/assets/a2742cbe-2710-452e-a097-f031e7d16ed7" />
+Status: expanded implementation prepared for pull-request review. **Not production validated:** a live Frappe/ERPNext bench is not available in this build environment. Unit/static tests are run before publishing; installation, scheduler operation, permissions and load overhead still need validation on a bench.
+
+The complete monitoring interface is inside this Frappe app's Desk. There is no separate Grafana service or Grafana dashboard package. Prometheus export is an optional integration only.
+
+## Implementation status
+
+The app includes request and background-job collection into Redis; minute host, MariaDB, cache Redis, RQ Redis, queue and Error Log/Email Queue samples; hourly database-table, backup, file-storage and log-directory scans; bulk/idempotent database flushing; retention pruning; a single multi-tab Desk dashboard using Frappe Charts; top-usage summaries; editable seeded Desk Alert Events with optional email notifications; and the audited read-only log browser. IPs are masked by default, user/IP identifiers are excluded from metric labels, and log path guards reject unsafe paths.
+
+The dashboard has in-app tabs for Overview, Traffic, Users & IPs, Server, Jobs & DB, Storage, Logs, Alerts, Diagnostics and Settings. In `external` mode it shows live Redis values without writing DB history. The current upstream Frappe `develop` tree does not provide a stable failed-login-attempt DocType or hook, so the app does not fabricate a failed-login count from generic error messages. Installation/migration, streaming downloads, mail delivery, multi-site isolation, actual chart rendering and performance/security acceptance criteria still require live-bench verification.
+
+## Install
+
+After this reviewed local working tree has been published to the app repository's `main` branch, install it on a bench running the matching current Frappe/ERPNext `develop` stack:
+
+```sh
+bench get-app https://github.com/coffeeinit/frappe_observability --branch main
+bench --site <site> install-app frappe_observability
+bench --site <site> migrate
+bench --site <site> enable-scheduler
+bench restart
+```
+
+Configure **Observability Settings** after installation. Prometheus export is disabled until the `external` or `both` mode and metric allowlist are configured. An administrator can rotate the bearer token once through `frappe_observability.api.rotate_export_token`; copy the returned token, because only its SHA-256 digest is saved. Initial supported metrics are `frappe_obs_requests_total`, `frappe_obs_request_errors_total`, `frappe_obs_request_bytes_in_total`, `frappe_obs_request_bytes_out_total`, `frappe_obs_jobs_total`, `frappe_obs_job_failures_total`, and `frappe_obs_job_duration_milliseconds_total`.
 
 ## 1. Introduction
 1.1 **Purpose.** A complete in-Desk metrics system, plus a log-file browser, for self-hosted ERPNext sites that have no monitoring today.
@@ -12,9 +33,9 @@ Status: draft for client review.
 1.4 **Reuse (not rebuilt).** Error Log, RQ Job, Recorder, System Health Report, Monitor (`monitor.json.log`). The app links to them.
 
 ## 2. Overall description
-2.1 **One package, one core, one toggle.** A single app. Collectors write to Redis. Mode `internal` | `external` | `both` decides the sinks. Sink A stores 7 days in the ERPNext DB. Sink B exposes `/metrics` for an external Prometheus and Grafana. There is no separate exporter package.
+2.1 **One app, one Desk experience.** Collectors write to Redis. Mode `internal` | `external` | `both` controls database history and optional Prometheus export. The app's own Desk page uses Frappe Charts; there is no separate Grafana service or dashboard package.
 2.2 **Users.** System Manager (site data, site logs), Observability Admin (new role), Administrator (bench-level host metrics and bench logs), Prometheus scraper (token, `/metrics` only).
-2.3 **Constraints.** No per-sample DocType inserts via `doc.insert()`. No DB writes in the request path. Frappe 16.5 only; CI against the exact 16.5 revisions.
+2.3 **Constraints.** No per-sample DocType inserts via `doc.insert()`. No DB writes in the request path. Compatibility follows the current upstream Frappe/ERPNext `develop` pair; a release should record tested commit SHAs because the branches move.
 2.4 **Assumptions.** One bench host in v1. Scheduler enabled. Redis cache and queue reachable. The bench user can read `logs/` and `sites/*/logs/`.
 
 ### 2.5 Architecture diagram
@@ -59,13 +80,10 @@ flowchart TB
         MON["Monitor: monitor.json.log"]
     end
 
-    subgraph EXTS["External stack (optional, self-hosted)"]
-        PROM["Prometheus"]
-        GRAF["Grafana<br/>dashboards + alerts.yml from repo"]
-    end
+    PROM["Optional Prometheus scraper<br/>for the authenticated /metrics endpoint"]
 
     USER(["System Manager /<br/>Observability Admin /<br/>Administrator"])
-    NOTIFY(["Recipients<br/>Frappe Notification + email"])
+    NOTIFY(["Desk Alert Events<br/>Optional email recipients"])
 
     REQ --> COL
     JOB --> COL
@@ -100,7 +118,6 @@ flowchart TB
 
     RED -->|cumulative counters| MET
     PROM -->|scrape over HTTPS| MET
-    PROM --> GRAF
 ```
 
 ## 3. Functional requirements
@@ -114,7 +131,7 @@ flowchart TB
 - FR-C6 Host: CPU %, load, RAM, swap, disk used/free per mount, disk IO, network bytes in/out.
 - FR-C7 DB: connections vs max, threads running, slow-query count, buffer-pool hit ratio, DB size, top 10 tables by size (hourly), long-running query count.
 - FR-C8 Redis (cache and queue): memory vs maxmemory, clients, hit rate, evictions.
-- FR-C9 App health: Error Log rows/min, failed logins/min, Email Queue pending and error counts, last backup age and size per site, public/private file storage size (hourly).
+- FR-C9 App health: Error Log rows/min, Email Queue pending/error counts, last backup age/size per site, and public/private file storage size (hourly). Failed-login counts are not fabricated: current upstream Frappe has no stable core login-attempt DocType or failure hook.
 - FR-C10 Fail-open: a collector exception never affects the request or job. Collector errors are counted and shown.
 - FR-C11 Labels limited to site, host, normalized endpoint (top 50 then `other`), queue, status class. User and IP are never metric labels.
 
@@ -126,12 +143,12 @@ flowchart TB
 - FR-S5 Show "last flush" and collector-error count on the workspace.
 
 ### 3.3 Desk workspace (single place)
-- FR-U1 Workspace **Observability** with pages: Overview, Traffic, Users & IPs, Server, Jobs & DB, Storage & Backups, Logs, Alerts, Diagnostics, Settings.
+- FR-U1 One **Observability** Desk page with in-app tabs: Overview, Traffic, Users & IPs, Server, Jobs & DB, Storage, Logs, Alerts, Diagnostics, Settings. Charts use Frappe Charts; no external dashboard service is needed.
 - FR-U2 Overview Number Cards: req/min, error %, p95, active users, active IPs, bandwidth, CPU, RAM, disk, queue depth, backup age, last flush.
-- FR-U3 Time ranges 15m, 1h, 6h, 24h, 7d. Site and host filters.
+- FR-U3 Time ranges 15m, 1h, 6h, 24h, 7d. Every Frappe site is isolated automatically; v1 assumes one bench host and therefore has no additional site/host selector.
 - FR-U4 Diagnostics page links to Error Log, RQ Job, Recorder, System Health Report.
 - FR-U5 Bench-level pages (Server, bench logs) require Administrator or the bench-level flag.
-- FR-U6 In `external` mode the workspace shows live values from Redis only (no history charts). History lives in Grafana.
+- FR-U6 In `external` mode the same Desk page shows live values from Redis; the database history sink is disabled. There is no Grafana dependency.
 
 ### 3.4 Log file browser
 - FR-L1 Discover files in `<bench>/logs/` and `<bench>/sites/<site>/logs/`. Extra roots can be added in Settings by an admin.
@@ -150,16 +167,16 @@ flowchart TB
 ### 3.5 Alerts
 - FR-A1 `Alert Rule` and `Alert Event` DocTypes. Evaluated after each flush. Cooldown per rule. Acknowledge supported.
 - FR-A2 Default rules: disk >85% (warn) and >95% (critical), backup older than 48 h, queue backlog, error rate, DB connections >80%, Redis memory >90%, flush stale >3 min, log directory size.
-- FR-A3 Notify through Frappe Notification and email.
+- FR-A3 Persist events in the app's Desk Alerts view and send email through the configured Frappe mail account when recipients are configured.
 - FR-A4 Stated limit: no alert is possible if ERPNext is down.
-- FR-A5 In `external` mode (no flush) the in-app evaluator runs on a 1-minute schedule against live Redis values. Prometheus-side alerts use the shipped `alerts.yml`.
+- FR-A5 In `external` mode (no DB flush) the in-app evaluator still runs on the configured schedule against live Redis values. Alert rules are managed in the Frappe app.
 
 ### 3.6 External export (Sink B)
 - FR-E1 Toggle in Settings (mode `external` or `both`). Endpoint `/api/method/frappe_observability.api.metrics`.
 - FR-E2 Bearer token (stored hashed) plus optional CIDR allowlist. Not public by default.
 - FR-E3 Prometheus text format rendered from the cumulative Redis counters (no multiprocess client needed). Not read from the DB.
 - FR-E4 Metric allowlist in Settings. Prefix `frappe_obs_`.
-- FR-E5 Repo ships `grafana/*.json` dashboards and `alerts.yml`.
+- FR-E5 All human-facing dashboards and default alert rules ship inside this Frappe app. Prometheus export is optional; no Grafana package is shipped.
 
 ### 3.7 Settings (single DocType)
 Mode, retention days, flush interval, IP storage (full or /24-masked), metric allowlist, export token and CIDRs, log roots, redaction patterns, download-confirm threshold, alert recipients.
@@ -177,11 +194,11 @@ Mode, retention days, flush interval, IP storage (full or /24-masked), metric al
 - NFR-2 `flush` completes in <5 s for a typical minute. Prune never holds long locks.
 - NFR-3 Settings changes take effect within 60 s without restart.
 - NFR-4 IPs are personal data: masking option, admin-only top-N, audit trail.
-- NFR-5 Compatibility: Frappe/ERPNext 16.5 only, `[tool.bench.frappe-dependencies]` pinned. Verify hook names (`before_request`, `after_request`, `before_job`, `after_job`) and the Log Settings clear hook on 16.5.
+- NFR-5 Compatibility: current upstream Frappe/ERPNext `develop` pair, with the app's `[tool.bench.frappe-dependencies]` range matching Frappe 17 development versions. Verify against pinned SHAs before release.
 - NFR-6 Multi-site isolation: a site's System Manager sees only that site's data and logs.
 
 ## 6. Install and operations
-1. `bench get-app <git-url> --branch <16.5 branch>`
+1. `bench get-app https://github.com/coffeeinit/frappe_observability --branch main` on a bench using matching Frappe/ERPNext `develop` checkouts.
 2. `bench --site <site> install-app frappe_observability`
 3. `bench --site <site> migrate`
 4. `bench restart` (production: supervisor or systemd restart)
@@ -189,8 +206,8 @@ Mode, retention days, flush interval, IP storage (full or /24-masked), metric al
 
 Uninstall: `bench --site <site> uninstall-app frappe_observability`. Host logrotate is a prerequisite.
 
-## 7. Acceptance criteria
-- AC-1 Install, migrate and uninstall succeed on a clean 16.5 bench.
+## 7. Acceptance criteria (not yet verified)
+- AC-1 Install, migrate and uninstall succeed on a clean bench using the targeted upstream `develop` pair.
 - AC-2 Under load, request, bandwidth, active-user and active-IP figures match a reference generator within 2%.
 - AC-3 Rows older than retention are removed within 24 h. Table size stays bounded.
 - AC-4 Log browser lists files with correct path and size. Tail and download work on a >1 GB file with flat memory use.

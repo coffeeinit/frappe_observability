@@ -1,0 +1,1 @@
+"""Desk configuration for Frappe Observability."""

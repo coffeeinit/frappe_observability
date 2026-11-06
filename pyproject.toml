@@ -1,0 +1,19 @@
+[build-system]
+requires = ["flit_core >=3.4.0,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "frappe-observability"
+authors = [{ name = "Frappe Observability Contributors" }]
+description = "All-in-one observability app for Frappe Framework and ERPNext"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["psutil>=5.9"]
+license = { file = "LICENSE" }
+dynamic = ["version"]
+
+[tool.flit.module]
+name = "frappe_observability"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=17.0.0-dev,<18.0.0"
